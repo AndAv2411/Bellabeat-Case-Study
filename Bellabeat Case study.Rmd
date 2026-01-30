@@ -1,0 +1,132 @@
+---
+title: "Bellabeat Case Study: Wellness Data Analyisis"
+author: "Andres Mauricio Aviles Camacho"
+date: "2026-01-27"
+output: 
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+```
+
+# 1. Executive Summary (Ask phase)
+Bellabeat is a high-tech manufacturer of health-focused products for women.The goal of this
+case study is to analyze smart device usage data from non-Bellabeat productsto gain insights into customer trends. These insights will help guiding the market strategy for company.
+
+**Business task:** Analyze smart device usage data to identify trends un how consumers use non-Bellabeat smart devices and apply these insights to Bellabeat's marketing strategy.
+
+# 2. Data Preparation (Prepare phase)
+For this analysis, we're using the FitBit Fitness Tracker (CC0: Public Domain, dataset made available through Mobius).
+
+```{r}
+# Loading necessary packages
+library(tidyverse)
+library(janitor)
+library(lubridate)
+
+# Setting plot theme
+theme_set(theme_minimal())
+```
+
+Importing the primary datasets: Daily Activity and Sleep Day
+
+```{r}
+# Note: Ensure CSV files are in the _data directory
+daily_activity <- read_csv("_data/daily_activity_merged.csv")
+sleep_day <- read_csv("_data/daily_activity_merged.csv")
+```
+
+## Data integrity and Verification
+We verify the number of unique users in each dataframe to check against the documentation (wich stated 30 different users)
+
+```{r}
+n_distinct(daily_activity$Id)
+n_distinct(sleep_day$Id)
+```
+
+* **Key observation:** There are 33 unique users in the daily dataset, but only 24 in the sleep dataset. This suggests that a significant portion of usersdo not wear the device to sleep.
+
+# 3. Process and Cleaning
+We perform data cleaning steps: fixing date formats and removing duplicates from both data frames.
+
+```{r}
+# Fixing date formats
+daily_activity <- daily_activity %>%
+  mutate(ActivityDate = mdy(ActivityDate)) %>% 
+  rename(Date = ActivityDate)
+
+sleep_day <- sleep_day %>%
+  mutate(SleepDay = as_date(mdy_hms(SleepDay))) %>% 
+  rename(Date = SleepDay)
+
+# Removing duplicates
+daily_activity <- daily_activity %>% distinct()
+sleep_day <- sleep_day %>% distinct()
+```
+
+Merging datasets to analyize the relationship between activity and sleep.
+
+```{r}
+combined_data <- merge(daily_activity, sleep_day, by=c("Id", "Date"))
+head(combined_data)
+```
+
+# 4. Analysis
+We generate a statistical summary of the main metrics.
+
+```{r}
+combined_data %>%
+  select(TotalSteps, TotalDistance, SedentaryMinutes, TotalMinutesAsleep) %>%
+  summary()
+```
+
+## Key findings
+* **Steps:** The average is 8,515 steps, which is below the common health recommendation of 10,000 steps.
+* **Sedentary Time:** Users spend an average of 712 minutes (11.8 hours) sedentary per day.
+* **Sleep** The average sleep duration is 419 minutes (~7 hours), which is adequate but could be improved.
+
+# 5. Visualizations (Share phase) 
+## A. Does inactivity affect sleep? 
+We investigate if sedentary time has a negative correlation with sleep duration.
+
+```{r}
+ggplot(data = combined_data, aes(x = SedentaryMinutes, y = TotalMinutesAsleep)) +
+  geom_point(color = "purple", alpha = 0.6) +
+  geom_smooth(method = "lm", color = "black") +
+  labs(title = "Sedentary Minutes vs. Sleep Duration",
+       subtitle = "Negative correlation: More sedentary time is linked to less sleep",
+       x = "Daily Sedentary Minutes",
+       y = "Minutes Asleep")
+```
+
+* **Insight:** There is a clear negative correlation. Users who are more sedentary during the day tend to get less sleep at night.
+
+## B. Activity vs. Calories
+Validating that higher activity intensity leads to higher caloric burn.
+
+```{r}
+ggplot(data = daily_activity, aes(x = TotalSteps, y = Calories)) +
+  geom_point(aes(color = TotalSteps), alpha = 0.7) +
+  geom_smooth(method = "lm", color = "red") + 
+  scale_color_gradient(low = "blue", high = "orange") +
+  labs(title = "Total Steps vs. Calories Burned",
+       x = "Total Steps",
+       y = "Calories")
+```
+
+# 6. Recommendations (Act phase)
+Based on the data analysis, the following strategies are recommended for the Bellabeat marketing team:
+1. "Rest via Movement" Smart alerts: 
+  * Insight: The data shows a negative correlation between sedentary time and sleep.
+  * Strategy: The Bellabeat App should send personalized notifications after long periodsof 
+  inactivity, educating users that "a short walk can improve your sleep tonight."
+2. "Comfort That Never sleeps" Campaign:
+  * Insight: 9 users (nearly 30% of the samples) stop using the device at night.
+  * Strategy: Market the Leaf tracker for its comfort (clip/necklace form factor) compared    to bulky competitor watches, emphasizing it as the best device for uninterrupted sleep      tracking.
+3. Gamification of Micro-Habits:
+  * Insight: Users are sedentary for nearly 12 hours a day. 
+  * Strategy: Instead of focusing on 10,000 steps, introduce in-app challenges that reward    breaking up sedentary blocks every 2 hours. This aligns with Bellabeat's mission of         holisitc wellness.
